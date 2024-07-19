@@ -2,15 +2,15 @@ pipeline {
     agent any
     
     environment {
-        REGISTRY = "your_docker_registry"
-        IMAGE = "your_image_name"
-        K8S_CLUSTER = "your_k8s_cluster_config"
+        REGISTRY = "docker.io/my-org"
+        IMAGE = "myapp"
+        K8S_CLUSTER = "kubeconfig"
     }
     
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/your-repo.git'
+                git branch: 'main', url: 'https://github.com/my-org/myapp.git'
             }
         }
         
@@ -25,7 +25,7 @@ pipeline {
         stage('Push') {
             steps {
                 script {
-                    docker.withRegistry("https://${env.REGISTRY}", 'registry_credentials') {
+                    docker.withRegistry("https://${env.REGISTRY}", 'docker_credentials') {
                         image.push()
                     }
                 }
@@ -35,8 +35,14 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    // Blue-Green Deployment logic
-                    // Use kubectl or Kubernetes plugin commands to handle deployment
+                    def currentDeployment = sh(script: "kubectl get svc myapp-service -o jsonpath='{.spec.selector.app}'", returnStdout: true).trim()
+                    def newDeployment = currentDeployment == 'blue' ? 'green' : 'blue'
+                    
+                    // Deploy to the new environment
+                    sh "kubectl apply -f k8s/${newDeployment}-deployment.yaml"
+                    
+                    // Switch the service to the new deployment
+                    sh "kubectl patch svc myapp-service -p '{\"spec\":{\"selector\":{\"app\":\"${newDeployment}\"}}}'"
                 }
             }
         }
@@ -45,7 +51,14 @@ pipeline {
     post {
         failure {
             script {
-                // Implement rollback logic
+                def failedDeployment = sh(script: "kubectl get svc myapp-service -o jsonpath='{.spec.selector.app}'", returnStdout: true).trim()
+                def previousDeployment = failedDeployment == 'blue' ? 'green' : 'blue'
+                
+                // Revert the service to the previous deployment
+                sh "kubectl patch svc myapp-service -p '{\"spec\":{\"selector\":{\"app\":\"${previousDeployment}\"}}}'"
+                
+                // Optionally, delete the failed deployment
+                sh "kubectl delete deployment ${failedDeployment}-deployment"
             }
         }
     }
