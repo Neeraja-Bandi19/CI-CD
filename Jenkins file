@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+
+    environment {
+        KUBECONFIG = credentials('kubeconfig-token') // Jenkins credentials ID for kubeconfig
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/your-repo/nodejs-app.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                script {
+                    docker.build('nodejs-app:latest')
+                }
+            }
+        }
+        stage('Push') {
+            steps {
+                script {
+                    docker.withRegistry('https://your-registry-url', 'docker-credentials-id') {
+                        docker.image('nodejs-app:latest').push('latest')
+                    }
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                script {
+                    kubectl.apply -f deployment-blue.yaml
+                    kubectl.apply -f service.yaml
+                    kubectl.apply -f ingress.yaml
+                }
+            }
+        }
+        stage('Blue-Green Deployment') {
+            steps {
+                script {
+                    sh 'kubectl apply -f deployment-green.yaml'
+                    sh 'kubectl rollout status deployment/nodejs-app-green'
+                }
+            }
+        }
+    }
+}
