@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        KUBECONFIG = credentials('kubeconfig-token') // Jenkins credentials ID for kubeconfig
+        KUBECONFIG = credentials('kubeconfig-token') 
     }
 
     stages {
