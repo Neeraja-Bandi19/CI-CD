@@ -1,3 +1,6 @@
+##Define two identical production environments (Blue and Green).
+Deploy new versions to the inactive environment and switch traffic when ready.##
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
